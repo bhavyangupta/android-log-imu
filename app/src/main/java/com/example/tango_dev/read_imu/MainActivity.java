@@ -7,7 +7,19 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.util.Log;
 import android.hardware.*;
+import android.os.Environment;
+
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.List;
+import java.io.File;
+import java.io.PrintWriter;
+import java.util.Date;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener{
     private String TAG = "mylog";
@@ -15,7 +27,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor sensor_accel;
     private Sensor sensor_gyro;
     private boolean gyro_enabled;
-
+    private File log_file;
+    private String log_directory_name;
+    private String log_file_name;
+    private String log_file_name_absolute;
+    private FileOutputStream log_file_out_stream;
+    private PrintWriter log_file_out_print;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -31,6 +48,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Log.e(TAG,"Gyro Does not exist.Won't log");
             gyro_enabled = false;
         }
+        DateFormat dateFormatter = new SimpleDateFormat("yyyMMdd hh:mm:ss");
+        dateFormatter.setLenient(false);
+        Date today = new Date();
+
+        log_directory_name = make_storage_directory("test_1");
+        log_file_name = dateFormatter.format(today)+".txt" ;
+        log_file_name_absolute = log_directory_name + log_file_name;
+        Log.i(TAG,log_file_name_absolute);
+
+        log_file = new File(log_directory_name,log_file_name);
+        try {
+            log_file_out_stream = new FileOutputStream(log_file);
+            log_file_out_print = new PrintWriter(log_file_out_stream);
+        }catch(IOException e){
+            e.printStackTrace();
+        }
         Log.i(TAG,"onCreate");
     }
 
@@ -43,6 +76,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
     }
 
+    public String make_storage_directory(String folder_name){
+        String directory_name = null;
+        File directory;
+        directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),folder_name);
+        Log.i(TAG,directory.getAbsolutePath());
+        directory.mkdirs();
+        directory_name = directory.getAbsolutePath();
+        return directory_name;
+    }
+
+    public void write_to_file(String data){
+            log_file_out_print.println(data);
+    }
     @Override
     public final void onAccuracyChanged(Sensor sensor, int accuracy){
         Log.i(TAG,sensor.getName()+"Sensor Accuracy Changed");
@@ -53,15 +99,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         if(event.sensor.getType()==Sensor.TYPE_ACCELEROMETER){
             Log.i(TAG,"A: ");
-            final String log_msg_accel = String.valueOf(event.timestamp) + " " + String.valueOf(event.values[0]) + "," + String.valueOf(event.values[1]) + "," + String.valueOf(event.values[2]);
-            Log.i(TAG,log_msg_accel);
+            final String log_msg_accel = "A: "+String.valueOf(event.timestamp) + " " + String.valueOf(event.values[0]) + "," + String.valueOf(event.values[1]) + "," + String.valueOf(event.values[2]);
+//            Log.i(TAG,log_msg_accel);
+            write_to_file(log_msg_accel);
         }
         if((event.sensor.getType()==Sensor.TYPE_GYROSCOPE)&&(gyro_enabled)){
             Log.i(TAG,"G: ");
-            final String log_msg_gyro = String.valueOf(event.timestamp) + " " + String.valueOf(event.values[0]) + "," + String.valueOf(event.values[1]) + "," + String.valueOf(event.values[2]);
-            Log.i(TAG,log_msg_gyro);
+            final String log_msg_gyro = "G: "+String.valueOf(event.timestamp) + " " + String.valueOf(event.values[0]) + "," + String.valueOf(event.values[1]) + "," + String.valueOf(event.values[2]);
+//            Log.i(TAG,log_msg_gyro);
+            write_to_file(log_msg_gyro);
         }
+
     }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -99,6 +149,17 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         my_sensor_manager.unregisterListener(this);
         if(gyro_enabled){
             my_sensor_manager.registerListener(this,sensor_gyro,SensorManager.SENSOR_DELAY_FASTEST);
+        }
+    }
+
+    @Override
+    public void onDestroy(){
+        super.onDestroy();
+        try {
+            log_file_out_print.close();
+            log_file_out_stream.close();
+        }catch(IOException e){
+            e.printStackTrace();
         }
     }
 }
